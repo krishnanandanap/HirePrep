@@ -61,7 +61,7 @@ export default function Dashboard() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 22 }}>🧠</span>
-          <span style={{ fontWeight: 700, fontSize: 18 }}>PrepIQ</span>
+          <span style={{ fontWeight: 700, fontSize: 18 }}>HirePrep</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ color: 'var(--muted)', fontSize: 14 }}>👤 {user.name}</span>

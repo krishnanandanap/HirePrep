@@ -37,7 +37,7 @@ export default function Login() {
             width: 52, height: 52, borderRadius: 14,
             background: 'var(--accent)', fontSize: 24, marginBottom: 12
           }}>🧠</div>
-          <h1 style={{ fontSize: 26, fontWeight: 700 }}>PrepIQ</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 700 }}>HirePrep</h1>
           <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 4 }}>Sign in to your account</p>
         </div>
 
