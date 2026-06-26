@@ -35,20 +35,52 @@ export default function TestPage() {
   const navigate = useNavigate();
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState({});   // { [questionId]: "A" | "B" | "C" | "D" }
+  const [questionState, setQuestionState] = useState({});  
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const timerRef = useRef(null);
 
   useEffect(() => {
-    api.get('/questions').then(({ data }) => {
-      setQuestions(data);
-      setLoading(false);
+  api.get('/questions').then(({ data }) => {
+    setQuestions(data);
+
+    const initialState = {};
+
+    data.forEach(q => {
+      initialState[q.id] = {
+        answer: null,
+        visited: false,
+        review: false,
+      };
     });
-  }, []);
+
+    if (data.length > 0) {
+      initialState[data[0].id].visited = true;
+    }
+
+    setQuestionState(initialState);
+    setLoading(false);
+  });
+}, []);
 
   // Start timer once questions are loaded
+  useEffect(() => {
+  if (questions.length === 0) return;
+
+  const questionId = questions[current]?.id;
+
+  if (!questionId) return;
+
+  setQuestionState(prev => ({
+    ...prev,
+    [questionId]: {
+      ...prev[questionId],
+      visited: true,
+    },
+  }));
+}, [current, questions]);
+
   useEffect(() => {
     if (loading || submitting) return;
     timerRef.current = setInterval(() => {
@@ -61,14 +93,67 @@ export default function TestPage() {
   }, [loading]);
 
   const handleAnswer = (questionId, option) => {
-    setAnswers(prev => ({ ...prev, [questionId]: option }));
-  };
+  setQuestionState(prev => ({
+    ...prev,
+    [questionId]: {
+      ...prev[questionId],
+      answer: option,
+    },
+  }));
+};
+  const markForReview = (questionId) => {
+  setQuestionState(prev => ({
+    ...prev,
+    [questionId]: {
+      ...prev[questionId],
+      review: true,
+    },
+  }));
+};
+
+const clearResponse = (questionId) => {
+  setQuestionState(prev => ({
+    ...prev,
+    [questionId]: {
+      ...prev[questionId],
+      answer: null,
+      review: false,
+    },
+  }));
+};
+
+const getQuestionStatus = (questionId) => {
+  const q = questionState[questionId];
+
+  if (!q) return "NOT_VISITED";
+
+  if (!q.visited) return "NOT_VISITED";
+
+  if (q.review && q.answer) return "ANSWERED_REVIEW";
+
+  if (q.review) return "REVIEW";
+
+  if (q.answer) return "ANSWERED";
+
+  return "NOT_ANSWERED";
+};
 
   const handleSubmit = async () => {
     clearInterval(timerRef.current);
     setSubmitting(true);
     try {
-      const { data } = await api.post('/submit', { userId: user.userId, answers });
+      const answers = {};
+
+Object.keys(questionState).forEach(id => {
+  if (questionState[id].answer) {
+    answers[id] = questionState[id].answer;
+  }
+});
+
+const { data } = await api.post('/submit', {
+  userId: user.userId,
+  answers,
+});
       navigate('/result', { state: { result: data } });
     } catch {
       alert('Submission failed. Please try again.');
@@ -88,7 +173,9 @@ export default function TestPage() {
   }
 
   const q = questions[current];
-  const answered = Object.keys(answers).length;
+  const answered = Object.values(questionState).filter(
+  q => q.answer !== null
+).length;
   const options = [
     { key: 'A', text: q.optionA },
     { key: 'B', text: q.optionB },
@@ -123,18 +210,44 @@ export default function TestPage() {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
           {questions.map((qq, i) => (
             <button key={qq.id} onClick={() => setCurrent(i)} style={{
-              width: 34, height: 34, borderRadius: 8, border: 'none',
+  position: "relative",
+  width: 34,
+  height: 34, borderRadius: 8, border: "none",
               cursor: 'pointer', fontSize: 12, fontWeight: 600,
-              background: i === current
-                ? 'var(--accent)'
-                : answers[qq.id]
-                  ? 'rgba(108,99,255,0.25)'
-                  : 'var(--surface2)',
-              color: i === current ? '#fff' : answers[qq.id] ? 'var(--accent-light)' : 'var(--muted)',
+              background:
+  i === current
+    ? 'var(--accent)'
+    : getQuestionStatus(qq.id) === "ANSWERED_REVIEW"
+    ? '#d6912a'
+    : getQuestionStatus(qq.id) === "REVIEW"
+    ? '#d6912a'
+    : getQuestionStatus(qq.id) === "ANSWERED"
+    ? '#22c55e'
+    : getQuestionStatus(qq.id) === "NOT_ANSWERED"
+    ? '#ef4444'
+    : 'var(--surface2)',
+
+color: '#fff',
               transition: 'all 0.15s',
             }}>
-              {i + 1}
-            </button>
+              
+  {i + 1}
+
+  {getQuestionStatus(qq.id) === "ANSWERED_REVIEW" && (
+    <span
+      style={{
+      position: "absolute",
+      bottom: -2,
+      right: -2,
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      backgroundColor: "#22c55e",
+      border: "2px solid white",
+    }}
+    />
+  )}
+</button>
           ))}
         </div>
 
@@ -149,7 +262,7 @@ export default function TestPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {options.map(({ key, text }) => {
-              const selected = answers[q.id] === key;
+              const selected = questionState[q.id]?.answer === key;
               return (
                 <button key={key} onClick={() => handleAnswer(q.id, key)}
                   style={{
@@ -182,8 +295,22 @@ export default function TestPage() {
             disabled={current === 0} style={{ flex: 1 }}>
             ← Previous
           </button>
+          <button
+  className="btn btn-outline"
+  style={{ flex: 1 }}
+  onClick={() => {
+    markForReview(q.id);
+
+    if (current < questions.length - 1) {
+      setCurrent(c => c + 1);
+    }
+  }}
+>
+  Mark for Review →
+</button>
           {current < questions.length - 1 ? (
             <button className="btn btn-primary" onClick={() => setCurrent(c => c + 1)} style={{ flex: 1 }}>
+
               Next →
             </button>
           ) : (
