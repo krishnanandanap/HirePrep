@@ -97,7 +97,10 @@ export default function TestPage() {
     ...prev,
     [questionId]: {
       ...prev[questionId],
-      answer: option,
+      answer:
+        prev[questionId].answer === option
+          ? null
+          : option,
     },
   }));
 };
@@ -185,7 +188,12 @@ const { data } = await api.post('/submit', {
 
   return (
     <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
-      <div style={{ maxWidth: 680, margin: '0 auto' }}>
+      <div
+  style={{
+    maxWidth: 1200,
+    margin: '0 auto',
+  }}
+>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -202,55 +210,19 @@ const { data } = await api.post('/submit', {
         </div>
 
         {/* Timer */}
-        <div className="card" style={{ marginBottom: 20, padding: '16px 20px' }}>
-          <TimerBar seconds={timeLeft} />
-        </div>
+<div className="card" style={{ marginBottom: 20, padding: '16px 20px' }}>
+  <TimerBar seconds={timeLeft} />
+</div>
 
-        {/* Question navigation dots */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
-          {questions.map((qq, i) => (
-            <button key={qq.id} onClick={() => setCurrent(i)} style={{
-  position: "relative",
-  width: 34,
-  height: 34, borderRadius: 8, border: "none",
-              cursor: 'pointer', fontSize: 12, fontWeight: 600,
-              background:
-  i === current
-    ? 'var(--accent)'
-    : getQuestionStatus(qq.id) === "ANSWERED_REVIEW"
-    ? '#d6912a'
-    : getQuestionStatus(qq.id) === "REVIEW"
-    ? '#d6912a'
-    : getQuestionStatus(qq.id) === "ANSWERED"
-    ? '#22c55e'
-    : getQuestionStatus(qq.id) === "NOT_ANSWERED"
-    ? '#ef4444'
-    : 'var(--surface2)',
-
-color: '#fff',
-              transition: 'all 0.15s',
-            }}>
-              
-  {i + 1}
-
-  {getQuestionStatus(qq.id) === "ANSWERED_REVIEW" && (
-    <span
-      style={{
-      position: "absolute",
-      bottom: -2,
-      right: -2,
-      width: 16,
-      height: 16,
-      borderRadius: "50%",
-      backgroundColor: "#22c55e",
-      border: "2px solid white",
-    }}
-    />
-  )}
-</button>
-          ))}
-        </div>
-
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "3fr 1fr",
+    gap: 24,
+    alignItems: "start",
+  }}
+>
+  <div>
         {/* Question card */}
         <div className="card" style={{ marginBottom: 16 }}>
           <div style={{ marginBottom: 6, fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
@@ -288,7 +260,151 @@ color: '#fff',
             })}
           </div>
         </div>
+        </div>
+        
+<div className="card" style={{ padding: 20 }}>
+{/* Question navigation dots */}
+  <h3
+  style={{
+    marginBottom: 16,
+    fontSize: 16,
+    fontWeight: 600,
+  }}
+>
+  Question Palette
+</h3>      
+        <div style={{ display: "grid",
+gridTemplateColumns: "repeat(5, 1fr)",
+gap: 10, marginBottom: 20 }}>
+          {questions.map((qq, i) => (
+            <button key={qq.id} onClick={() => setCurrent(i)} style={{
+  position: "relative",
+ width: 48,
+height: 48, borderRadius: 12, border: "none",
+              cursor: 'pointer', fontSize: 15, fontWeight: 600,
+              background:
+  i === current
+    ? 'var(--accent)'
+    : getQuestionStatus(qq.id) === "ANSWERED_REVIEW"
+    ? '#d6912a'
+    : getQuestionStatus(qq.id) === "REVIEW"
+    ? '#d6912a'
+    : getQuestionStatus(qq.id) === "ANSWERED"
+    ? '#22c55e'
+    : getQuestionStatus(qq.id) === "NOT_ANSWERED"
+    ? '#ef4444'
+    : 'var(--surface2)',
 
+color: '#fff',
+              transition: 'all 0.15s',
+            }}>
+              
+  {i + 1}
+
+  {getQuestionStatus(qq.id) === "ANSWERED_REVIEW" && (
+    <span
+      style={{
+      position: "absolute",
+      bottom: -2,
+      right: -2,
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      backgroundColor: "#22c55e",
+      border: "2px solid white",
+    }}
+    />
+  )}
+</button>
+          ))}
+        </div>
+        <div
+  className="card"
+  style={{
+    padding: 18,
+    marginTop: 16,
+  }}
+>
+  <h3
+    style={{
+      fontSize: 16,
+      marginBottom: 14,
+      fontWeight: 600,
+    }}
+  >
+    
+  </h3>
+
+  {[
+    { color: "#22c55e", text: "Answered" },
+    { color: "#ef4444", text: "Not Answered" },
+    { color: "#d6912a", text: "Marked for Review" },
+    { color: "var(--surface2)", text: "Not Visited", border: true },
+  ].map((item) => (
+    <div
+      key={item.text}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 12,
+      }}
+    >
+      <div
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 5,
+          background: item.color,
+          border: item.border ? "1px solid var(--border)" : "none",
+        }}
+      />
+      <span style={{ fontSize: 14 }}>
+        {item.text}
+      </span>
+    </div>
+  ))}
+
+  {/* Answered + Review */}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+    }}
+  >
+    <div
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: 5,
+        background: "#d6912a",
+        position: "relative",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: "#22c55e",
+          bottom: -2,
+          right: -2,
+          border: "2px solid white",
+        }}
+      />
+    </div>
+
+    <span style={{ fontSize: 14 }}>
+      Answered & Review
+    </span>
+  </div>
+</div>
+        </div>
+        
+      </div>
+      
         {/* Prev / Next */}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <button className="btn btn-outline" onClick={() => setCurrent(c => c - 1)}
