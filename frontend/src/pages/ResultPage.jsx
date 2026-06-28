@@ -1,13 +1,24 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchCategoryScores } from '../utils/api';
+import CategoryScoreChart from '../components/CategoryScoreChart';
 
 export default function ResultPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const result = state?.result;
+  const [categoryScores, setCategoryScores] = useState([]);
 
   useEffect(() => {
     if (!result) navigate('/dashboard');
+  }, [result]);
+
+  // Fetch category scores using resultId
+  useEffect(() => {
+    if (!result?.id) return;
+    fetchCategoryScores(result.id)
+      .then(({ data }) => setCategoryScores(data))
+      .catch(() => {}); // silently fail if not available
   }, [result]);
 
   if (!result) return null;
@@ -77,6 +88,9 @@ export default function ResultPage() {
             Dashboard
           </button>
         </div>
+
+        {/* Category Chart — NEW */}
+        <CategoryScoreChart data={categoryScores} />
 
         {/* Breakdown */}
         <h3 style={{ fontWeight: 600, fontSize: 16, marginBottom: 14 }}>Question Breakdown</h3>

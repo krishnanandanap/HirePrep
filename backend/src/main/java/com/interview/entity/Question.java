@@ -29,4 +29,7 @@ public class Question {
 
     @Column(name = "correct_answer", nullable = false)
     private String correctAnswer; // "A", "B", "C", or "D"
+
+    @Column(name = "category")
+    private String category;
 }

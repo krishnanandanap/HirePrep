@@ -5,6 +5,7 @@ import java.util.List;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class SubmitResponseDTO {
+    private Long id; 
     private int score;
     private int correctAnswers;
     private int wrongAnswers;

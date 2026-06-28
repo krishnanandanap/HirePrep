@@ -4,7 +4,9 @@ import com.interview.dto.SubmitRequestDTO;
 import com.interview.dto.SubmitResponseDTO;
 import com.interview.entity.Question;
 import com.interview.entity.Result;
+import com.interview.entity.ResultAnswer;
 import com.interview.repository.QuestionRepository;
+import com.interview.repository.ResultAnswerRepository;
 import com.interview.repository.ResultRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,21 +21,21 @@ public class TestController {
 
     private final QuestionRepository questionRepository;
     private final ResultRepository resultRepository;
+    private final ResultAnswerRepository resultAnswerRepository; // ADD THIS
 
     public TestController(QuestionRepository questionRepository,
-                          ResultRepository resultRepository) {
+                          ResultRepository resultRepository,
+                          ResultAnswerRepository resultAnswerRepository) { // ADD THIS
         this.questionRepository = questionRepository;
         this.resultRepository = resultRepository;
+        this.resultAnswerRepository = resultAnswerRepository; // ADD THIS
     }
 
-    // POST /api/submit
     @PostMapping("/submit")
     public ResponseEntity<SubmitResponseDTO> submitTest(@RequestBody SubmitRequestDTO request) {
 
         Map<Long, String> userAnswers = request.getAnswers();
         List<Long> questionIds = new ArrayList<>(userAnswers.keySet());
-
-        // Fetch all answered questions from DB
         List<Question> questions = questionRepository.findAllById(questionIds);
 
         List<SubmitResponseDTO.QuestionResultDTO> breakdown = new ArrayList<>();
@@ -55,9 +57,9 @@ public class TestController {
 
         int total = questions.size();
         int wrong = total - correctCount;
-        int score = correctCount * 10; // 10 points per correct answer
+        int score = correctCount * 10;
 
-        // Save result to DB
+        // Save Result
         Result result = Result.builder()
                 .userId(request.getUserId())
                 .score(score)
@@ -66,9 +68,22 @@ public class TestController {
                 .totalQuestions(total)
                 .date(LocalDateTime.now())
                 .build();
-        resultRepository.save(result);
+        Result savedResult = resultRepository.save(result); // ← capture saved result
+
+        // Save ResultAnswers (NEW)
+        List<ResultAnswer> resultAnswers = questions.stream()
+                .map(q -> ResultAnswer.builder()
+                        .resultId(savedResult.getId())
+                        .questionId(q.getId())
+                        .selectedAnswer(userAnswers.get(q.getId()))
+                        .correct(q.getCorrectAnswer().equalsIgnoreCase(userAnswers.get(q.getId())))
+                        .category(q.getCategory())
+                        .build())
+                .collect(Collectors.toList());
+        resultAnswerRepository.saveAll(resultAnswers); // ← save all at once
 
         return ResponseEntity.ok(SubmitResponseDTO.builder()
+                .id(savedResult.getId()) 
                 .score(score)
                 .correctAnswers(correctCount)
                 .wrongAnswers(wrong)
