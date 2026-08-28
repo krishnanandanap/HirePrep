@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
 import api from '../utils/api';
 
@@ -33,6 +33,14 @@ function TimerBar({ seconds }) {
 export default function TestPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const categoryParam = searchParams.get('categories');
+  const selectedCategories = categoryParam
+    ? categoryParam.split(',').map((category) =>
+        decodeURIComponent(category)
+      )
+    : [];
+
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
   const [questionState, setQuestionState] = useState({});  
@@ -42,27 +50,40 @@ export default function TestPage() {
   const timerRef = useRef(null);
 
   useEffect(() => {
-  api.get('/questions').then(({ data }) => {
-    setQuestions(data);
+  const questionEndpoint =
+    selectedCategories.length > 0
+      ? `/questions/categories?categories=${selectedCategories
+          .map((cat) => encodeURIComponent(cat))
+          .join(',')}`
+      : '/questions';
 
-    const initialState = {};
+  api
+    .get(questionEndpoint)
+    .then(({ data }) => {
+      setQuestions(data);
 
-    data.forEach(q => {
-      initialState[q.id] = {
-        answer: null,
-        visited: false,
-        review: false,
-      };
+      const initialState = {};
+
+      data.forEach(q => {
+        initialState[q.id] = {
+          answer: null,
+          visited: false,
+          review: false,
+        };
+      });
+
+      if (data.length > 0) {
+        initialState[data[0].id].visited = true;
+      }
+
+      setQuestionState(initialState);
+      setLoading(false);
+    })
+    .catch((error) => {
+      console.error('Error fetching questions:', error);
+      setLoading(false);
     });
-
-    if (data.length > 0) {
-      initialState[data[0].id].visited = true;
-    }
-
-    setQuestionState(initialState);
-    setLoading(false);
-  });
-}, []);
+}, [categoryParam]);
 
   // Start timer once questions are loaded
   useEffect(() => {
@@ -198,7 +219,7 @@ const { data } = await api.post('/submit', {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
-            <h2 style={{ fontWeight: 700, fontSize: 20 }}>Mock Interview Test</h2>
+            <h2 style={{ fontWeight: 700, fontSize: 20 }}> {selectedCategories.length > 0 ? selectedCategories.join(' + ') + ' Quiz' : 'Mock Interview Test'}</h2>
             <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>
               {answered} of {questions.length} answered
             </p>

@@ -109,7 +109,7 @@ export default function Dashboard() {
               10 random MCQ questions · 10 minutes · 10 points each
             </p>
           </div>
-          <button className="btn btn-primary" onClick={() => navigate('/test')}
+          <button className="btn btn-primary" onClick={() => navigate('/categories')}
             style={{ fontSize: 15, padding: '13px 28px' }}>
             Start Test →
           </button>
