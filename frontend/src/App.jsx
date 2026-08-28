@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import TestPage from './pages/TestPage';
 import ResultPage from './pages/ResultPage';
+import CategorySelection from './pages/CategorySelection';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/categories" element={<PrivateRoute><CategorySelection /></PrivateRoute>} />
           <Route path="/test" element={<PrivateRoute><TestPage /></PrivateRoute>} />
           <Route path="/result" element={<PrivateRoute><ResultPage /></PrivateRoute>} />
         </Routes>
