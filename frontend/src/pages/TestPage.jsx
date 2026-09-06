@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
 import api from '../utils/api';
 
@@ -19,12 +19,17 @@ function TimerBar({ seconds }) {
           {mins}:{secs}
         </span>
       </div>
+
       <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden' }}>
-        <div style={{
-          height: '100%', width: `${pct}%`,
-          background: color, borderRadius: 4,
-          transition: 'width 1s linear, background 0.5s',
-        }} />
+        <div
+          style={{
+            height: '100%',
+            width: `${pct}%`,
+            background: color,
+            borderRadius: 4,
+            transition: 'width 1s linear, background 0.5s',
+          }}
+        />
       </div>
     </div>
   );
@@ -33,38 +38,35 @@ function TimerBar({ seconds }) {
 export default function TestPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+
   const categoryParam = searchParams.get('categories');
+
   const selectedCategories = categoryParam
-    ? categoryParam.split(',').map((category) =>
-        decodeURIComponent(category)
-      )
+    ? categoryParam.split(',').map((category) => decodeURIComponent(category))
     : [];
+
+  // Questions passed from ResultPage when Try Again is clicked
+  const retryQuestions = location.state?.questions || null;
 
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
-  const [questionState, setQuestionState] = useState({});  
+  const [questionState, setQuestionState] = useState({});
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
   const timerRef = useRef(null);
 
   useEffect(() => {
-  const questionEndpoint =
-    selectedCategories.length > 0
-      ? `/questions/categories?categories=${selectedCategories
-          .map((cat) => encodeURIComponent(cat))
-          .join(',')}`
-      : '/questions';
-
-  api
-    .get(questionEndpoint)
-    .then(({ data }) => {
-      setQuestions(data);
+    // If this is Try Again, use the exact same questions.
+    if (retryQuestions && retryQuestions.length > 0) {
+      setQuestions(retryQuestions);
 
       const initialState = {};
 
-      data.forEach(q => {
+      retryQuestions.forEach((q) => {
         initialState[q.id] = {
           answer: null,
           visited: false,
@@ -72,113 +74,163 @@ export default function TestPage() {
         };
       });
 
-      if (data.length > 0) {
-        initialState[data[0].id].visited = true;
-      }
+      initialState[retryQuestions[0].id].visited = true;
 
       setQuestionState(initialState);
+      setCurrent(0);
+      setTimeLeft(TOTAL_TIME);
       setLoading(false);
-    })
-    .catch((error) => {
-      console.error('Error fetching questions:', error);
-      setLoading(false);
-    });
-}, [categoryParam]);
+
+      return;
+    }
+
+    // Otherwise, load a new test normally.
+    const questionEndpoint =
+      selectedCategories.length > 0
+        ? `/questions/categories?categories=${selectedCategories
+            .map((cat) => encodeURIComponent(cat))
+            .join(',')}`
+        : '/questions';
+
+    api
+      .get(questionEndpoint)
+      .then(({ data }) => {
+        setQuestions(data);
+
+        const initialState = {};
+
+        data.forEach((q) => {
+          initialState[q.id] = {
+            answer: null,
+            visited: false,
+            review: false,
+          };
+        });
+
+        if (data.length > 0) {
+          initialState[data[0].id].visited = true;
+        }
+
+        setQuestionState(initialState);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error fetching questions:', error);
+        setLoading(false);
+      });
+  }, [categoryParam, retryQuestions]);
 
   // Start timer once questions are loaded
   useEffect(() => {
-  if (questions.length === 0) return;
+    if (questions.length === 0) return;
 
-  const questionId = questions[current]?.id;
+    const questionId = questions[current]?.id;
 
-  if (!questionId) return;
+    if (!questionId) return;
 
-  setQuestionState(prev => ({
-    ...prev,
-    [questionId]: {
-      ...prev[questionId],
-      visited: true,
-    },
-  }));
-}, [current, questions]);
+    setQuestionState((prev) => ({
+      ...prev,
+      [questionId]: {
+        ...prev[questionId],
+        visited: true,
+      },
+    }));
+  }, [current, questions]);
 
   useEffect(() => {
     if (loading || submitting) return;
+
     timerRef.current = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 1) { clearInterval(timerRef.current); handleSubmit(); return 0; }
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(timerRef.current);
+          handleSubmit();
+          return 0;
+        }
+
         return t - 1;
       });
     }, 1000);
+
     return () => clearInterval(timerRef.current);
   }, [loading]);
 
   const handleAnswer = (questionId, option) => {
-  setQuestionState(prev => ({
-    ...prev,
-    [questionId]: {
-      ...prev[questionId],
-      answer:
-        prev[questionId].answer === option
-          ? null
-          : option,
-    },
-  }));
-};
+    setQuestionState((prev) => ({
+      ...prev,
+      [questionId]: {
+        ...prev[questionId],
+        answer:
+          prev[questionId].answer === option
+            ? null
+            : option,
+      },
+    }));
+  };
+
   const markForReview = (questionId) => {
-  setQuestionState(prev => ({
-    ...prev,
-    [questionId]: {
-      ...prev[questionId],
-      review: true,
-    },
-  }));
-};
+    setQuestionState((prev) => ({
+      ...prev,
+      [questionId]: {
+        ...prev[questionId],
+        review: true,
+      },
+    }));
+  };
 
-const clearResponse = (questionId) => {
-  setQuestionState(prev => ({
-    ...prev,
-    [questionId]: {
-      ...prev[questionId],
-      answer: null,
-      review: false,
-    },
-  }));
-};
+  const clearResponse = (questionId) => {
+    setQuestionState((prev) => ({
+      ...prev,
+      [questionId]: {
+        ...prev[questionId],
+        answer: null,
+        review: false,
+      },
+    }));
+  };
 
-const getQuestionStatus = (questionId) => {
-  const q = questionState[questionId];
+  const getQuestionStatus = (questionId) => {
+    const q = questionState[questionId];
 
-  if (!q) return "NOT_VISITED";
+    if (!q) return 'NOT_VISITED';
 
-  if (!q.visited) return "NOT_VISITED";
+    if (!q.visited) return 'NOT_VISITED';
 
-  if (q.review && q.answer) return "ANSWERED_REVIEW";
+    if (q.review && q.answer) return 'ANSWERED_REVIEW';
 
-  if (q.review) return "REVIEW";
+    if (q.review) return 'REVIEW';
 
-  if (q.answer) return "ANSWERED";
+    if (q.answer) return 'ANSWERED';
 
-  return "NOT_ANSWERED";
-};
+    return 'NOT_ANSWERED';
+  };
 
   const handleSubmit = async () => {
     clearInterval(timerRef.current);
     setSubmitting(true);
+
     try {
       const answers = {};
 
-Object.keys(questionState).forEach(id => {
-  if (questionState[id].answer) {
-    answers[id] = questionState[id].answer;
-  }
-});
+      Object.keys(questionState).forEach((id) => {
+        if (questionState[id].answer) {
+          answers[id] = questionState[id].answer;
+        }
+      });
 
-const { data } = await api.post('/submit', {
-  userId: user.userId,
-  answers,
-});
-      navigate('/result', { state: { result: data } });
+      const { data } = await api.post('/submit', {
+        userId: user.userId,
+        answers,
+      });
+
+      // IMPORTANT:
+      // Pass the exact questions to ResultPage.
+      navigate('/result', {
+        state: {
+          result: data,
+          questions: questions,
+        },
+      });
     } catch {
       alert('Submission failed. Please try again.');
       setSubmitting(false);
@@ -197,9 +249,11 @@ const { data } = await api.post('/submit', {
   }
 
   const q = questions[current];
+
   const answered = Object.values(questionState).filter(
-  q => q.answer !== null
-).length;
+    (q) => q.answer !== null
+  ).length;
+
   const options = [
     { key: 'A', text: q.optionA },
     { key: 'B', text: q.optionB },
@@ -210,249 +264,372 @@ const { data } = await api.post('/submit', {
   return (
     <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
       <div
-  style={{
-    maxWidth: 1200,
-    margin: '0 auto',
-  }}
->
+        style={{
+          maxWidth: 1200,
+          margin: '0 auto',
+        }}
+      >
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 24,
+          }}
+        >
           <div>
-            <h2 style={{ fontWeight: 700, fontSize: 20 }}> {selectedCategories.length > 0 ? selectedCategories.join(' + ') + ' Quiz' : 'Mock Interview Test'}</h2>
-            <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>
+            <h2 style={{ fontWeight: 700, fontSize: 20 }}>
+              {selectedCategories.length > 0
+                ? selectedCategories.join(' + ') + ' Quiz'
+                : 'Mock Interview Test'}
+            </h2>
+
+            <p
+              style={{
+                color: 'var(--muted)',
+                fontSize: 13,
+                marginTop: 2,
+              }}
+            >
               {answered} of {questions.length} answered
             </p>
           </div>
-          <button className="btn btn-outline" onClick={handleSubmit}
-            disabled={submitting} style={{ fontSize: 13 }}>
+
+          <button
+            className="btn btn-outline"
+            onClick={handleSubmit}
+            disabled={submitting}
+            style={{ fontSize: 13 }}
+          >
             {submitting ? 'Submitting…' : 'Submit Now'}
           </button>
         </div>
 
         {/* Timer */}
-<div className="card" style={{ marginBottom: 20, padding: '16px 20px' }}>
-  <TimerBar seconds={timeLeft} />
-</div>
-
-<div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "3fr 1fr",
-    gap: 24,
-    alignItems: "start",
-  }}
->
-  <div>
-        {/* Question card */}
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div style={{ marginBottom: 6, fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-            QUESTION {current + 1} / {questions.length}
-          </div>
-          <h3 style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.5, marginBottom: 24 }}>
-            {q.question}
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {options.map(({ key, text }) => {
-              const selected = questionState[q.id]?.answer === key;
-              return (
-                <button key={key} onClick={() => handleAnswer(q.id, key)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    padding: '14px 16px', borderRadius: 10,
-                    border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
-                    background: selected ? 'var(--accent-dim)' : 'var(--surface2)',
-                    color: selected ? 'var(--accent-light)' : 'var(--text)',
-                    cursor: 'pointer', textAlign: 'left', fontSize: 14,
-                    transition: 'all 0.15s',
-                  }}>
-                  <span style={{
-                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 700, fontSize: 12,
-                    background: selected ? 'var(--accent)' : 'var(--surface)',
-                    color: selected ? '#fff' : 'var(--muted)',
-                    border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
-                  }}>{key}</span>
-                  {text}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        </div>
-        
-<div className="card" style={{ padding: 20 }}>
-{/* Question navigation dots */}
-  <h3
-  style={{
-    marginBottom: 16,
-    fontSize: 16,
-    fontWeight: 600,
-  }}
->
-  Question Palette
-</h3>      
-        <div style={{ display: "grid",
-gridTemplateColumns: "repeat(5, 1fr)",
-gap: 10, marginBottom: 20 }}>
-          {questions.map((qq, i) => (
-            <button key={qq.id} onClick={() => setCurrent(i)} style={{
-  position: "relative",
- width: 48,
-height: 48, borderRadius: 12, border: "none",
-              cursor: 'pointer', fontSize: 15, fontWeight: 600,
-              background:
-  i === current
-    ? 'var(--accent)'
-    : getQuestionStatus(qq.id) === "ANSWERED_REVIEW"
-    ? '#d6912a'
-    : getQuestionStatus(qq.id) === "REVIEW"
-    ? '#d6912a'
-    : getQuestionStatus(qq.id) === "ANSWERED"
-    ? '#22c55e'
-    : getQuestionStatus(qq.id) === "NOT_ANSWERED"
-    ? '#ef4444'
-    : 'var(--surface2)',
-
-color: '#fff',
-              transition: 'all 0.15s',
-            }}>
-              
-  {i + 1}
-
-  {getQuestionStatus(qq.id) === "ANSWERED_REVIEW" && (
-    <span
-      style={{
-      position: "absolute",
-      bottom: -2,
-      right: -2,
-      width: 16,
-      height: 16,
-      borderRadius: "50%",
-      backgroundColor: "#22c55e",
-      border: "2px solid white",
-    }}
-    />
-  )}
-</button>
-          ))}
-        </div>
         <div
-  className="card"
-  style={{
-    padding: 18,
-    marginTop: 16,
-  }}
->
-  <h3
-    style={{
-      fontSize: 16,
-      marginBottom: 14,
-      fontWeight: 600,
-    }}
-  >
-    
-  </h3>
-
-  {[
-    { color: "#22c55e", text: "Answered" },
-    { color: "#ef4444", text: "Not Answered" },
-    { color: "#d6912a", text: "Marked for Review" },
-    { color: "var(--surface2)", text: "Not Visited", border: true },
-  ].map((item) => (
-    <div
-      key={item.text}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        marginBottom: 12,
-      }}
-    >
-      <div
-        style={{
-          width: 18,
-          height: 18,
-          borderRadius: 5,
-          background: item.color,
-          border: item.border ? "1px solid var(--border)" : "none",
-        }}
-      />
-      <span style={{ fontSize: 14 }}>
-        {item.text}
-      </span>
-    </div>
-  ))}
-
-  {/* Answered + Review */}
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-    }}
-  >
-    <div
-      style={{
-        width: 18,
-        height: 18,
-        borderRadius: 5,
-        background: "#d6912a",
-        position: "relative",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: "#22c55e",
-          bottom: -2,
-          right: -2,
-          border: "2px solid white",
-        }}
-      />
-    </div>
-
-    <span style={{ fontSize: 14 }}>
-      Answered & Review
-    </span>
-  </div>
-</div>
+          className="card"
+          style={{
+            marginBottom: 20,
+            padding: '16px 20px',
+          }}
+        >
+          <TimerBar seconds={timeLeft} />
         </div>
-        
-      </div>
-      
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '3fr 1fr',
+            gap: 24,
+            alignItems: 'start',
+          }}
+        >
+          <div>
+
+            {/* Question card */}
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  marginBottom: 6,
+                  fontSize: 12,
+                  color: 'var(--muted)',
+                  fontWeight: 600,
+                }}
+              >
+                QUESTION {current + 1} / {questions.length}
+              </div>
+
+              <h3
+                style={{
+                  fontSize: 17,
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                  marginBottom: 24,
+                }}
+              >
+                {q.question}
+              </h3>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                {options.map(({ key, text }) => {
+                  const selected =
+                    questionState[q.id]?.answer === key;
+
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleAnswer(q.id, key)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 14,
+                        padding: '14px 16px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${
+                          selected
+                            ? 'var(--accent)'
+                            : 'var(--border)'
+                        }`,
+                        background: selected
+                          ? 'var(--accent-dim)'
+                          : 'var(--surface2)',
+                        color: selected
+                          ? 'var(--accent-light)'
+                          : 'var(--text)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: 14,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          background: selected
+                            ? 'var(--accent)'
+                            : 'var(--surface)',
+                          color: selected
+                            ? '#fff'
+                            : 'var(--muted)',
+                          border: `1.5px solid ${
+                            selected
+                              ? 'var(--accent)'
+                              : 'var(--border)'
+                          }`,
+                        }}
+                      >
+                        {key}
+                      </span>
+
+                      {text}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 20 }}>
+            {/* Question navigation dots */}
+            <h3
+              style={{
+                marginBottom: 16,
+                fontSize: 16,
+                fontWeight: 600,
+              }}
+            >
+              Question Palette
+            </h3>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: 10,
+                marginBottom: 20,
+              }}
+            >
+              {questions.map((qq, i) => (
+                <button
+                  key={qq.id}
+                  onClick={() => setCurrent(i)}
+                  style={{
+                    position: 'relative',
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 15,
+                    fontWeight: 600,
+
+                    background:
+                      i === current
+                        ? 'var(--accent)'
+                        : getQuestionStatus(qq.id) ===
+                          'ANSWERED_REVIEW'
+                        ? '#d6912a'
+                        : getQuestionStatus(qq.id) ===
+                          'REVIEW'
+                        ? '#d6912a'
+                        : getQuestionStatus(qq.id) ===
+                          'ANSWERED'
+                        ? '#22c55e'
+                        : getQuestionStatus(qq.id) ===
+                          'NOT_ANSWERED'
+                        ? '#ef4444'
+                        : 'var(--surface2)',
+
+                    color: '#fff',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {i + 1}
+
+                  {getQuestionStatus(qq.id) ===
+                    'ANSWERED_REVIEW' && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        bottom: -2,
+                        right: -2,
+                        width: 16,
+                        height: 16,
+                        borderRadius: '50%',
+                        backgroundColor: '#22c55e',
+                        border: '2px solid white',
+                      }}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div
+              className="card"
+              style={{
+                padding: 18,
+                marginTop: 16,
+              }}
+            >
+              {[
+                { color: '#22c55e', text: 'Answered' },
+                { color: '#ef4444', text: 'Not Answered' },
+                { color: '#d6912a', text: 'Marked for Review' },
+                {
+                  color: 'var(--surface2)',
+                  text: 'Not Visited',
+                  border: true,
+                },
+              ].map((item) => (
+                <div
+                  key={item.text}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 5,
+                      background: item.color,
+                      border: item.border
+                        ? '1px solid var(--border)'
+                        : 'none',
+                    }}
+                  />
+
+                  <span style={{ fontSize: 14 }}>
+                    {item.text}
+                  </span>
+                </div>
+              ))}
+
+              {/* Answered + Review */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 5,
+                    background: '#d6912a',
+                    position: 'relative',
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: '#22c55e',
+                      bottom: -2,
+                      right: -2,
+                      border: '2px solid white',
+                    }}
+                  />
+                </div>
+
+                <span style={{ fontSize: 14 }}>
+                  Answered & Review
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Prev / Next */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-          <button className="btn btn-outline" onClick={() => setCurrent(c => c - 1)}
-            disabled={current === 0} style={{ flex: 1 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <button
+            className="btn btn-outline"
+            onClick={() => setCurrent((c) => c - 1)}
+            disabled={current === 0}
+            style={{ flex: 1 }}
+          >
             ← Previous
           </button>
+
           <button
-  className="btn btn-outline"
-  style={{ flex: 1 }}
-  onClick={() => {
-    markForReview(q.id);
+            className="btn btn-outline"
+            style={{ flex: 1 }}
+            onClick={() => {
+              markForReview(q.id);
 
-    if (current < questions.length - 1) {
-      setCurrent(c => c + 1);
-    }
-  }}
->
-  Mark for Review →
-</button>
+              if (current < questions.length - 1) {
+                setCurrent((c) => c + 1);
+              }
+            }}
+          >
+            Mark for Review →
+          </button>
+
           {current < questions.length - 1 ? (
-            <button className="btn btn-primary" onClick={() => setCurrent(c => c + 1)} style={{ flex: 1 }}>
-
+            <button
+              className="btn btn-primary"
+              onClick={() => setCurrent((c) => c + 1)}
+              style={{ flex: 1 }}
+            >
               Next →
             </button>
           ) : (
-            <button className="btn btn-primary" onClick={handleSubmit}
-              disabled={submitting} style={{ flex: 1 }}>
+            <button
+              className="btn btn-primary"
+              onClick={handleSubmit}
+              disabled={submitting}
+              style={{ flex: 1 }}
+            >
               {submitting ? 'Submitting…' : '✓ Submit Test'}
             </button>
           )}
