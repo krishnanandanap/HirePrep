@@ -79,6 +79,26 @@ export default function ResultPage() {
     return map[key.toUpperCase()] || key;
   };
 
+  // Questions answered incorrectly in this test
+  const wrongQuestions = questions.filter((question) =>
+    breakdown?.some(
+      (item) =>
+        item.questionId === question.id &&
+        !item.correct
+    )
+  );
+
+  // Start a test containing only the questions answered incorrectly
+  const practiceWrongQuestions = () => {
+    if (wrongQuestions.length === 0) return;
+
+    navigate('/test', {
+      state: {
+        wrongQuestions: wrongQuestions,
+      },
+    });
+  };
+
   return (
     <div
       style={{
@@ -252,6 +272,7 @@ export default function ResultPage() {
             marginBottom: 28,
           }}
         >
+          {/* Try Again */}
           <button
             className="btn btn-primary"
             onClick={() =>
@@ -266,10 +287,31 @@ export default function ResultPage() {
             Try Again
           </button>
 
+          {/* Practice Wrong Questions */}
+          <button
+            className="btn btn-outline"
+            onClick={practiceWrongQuestions}
+            disabled={wrongQuestions.length === 0}
+            style={{
+              flex: 1,
+              opacity: wrongQuestions.length === 0 ? 0.5 : 1,
+              cursor:
+                wrongQuestions.length === 0
+                  ? 'not-allowed'
+                  : 'pointer',
+                  borderColor: 'var(--red)',
+            }}
+          >
+            {wrongQuestions.length === 0
+              ? '✓ No Wrong Questions'
+              : `Wrong Questions Test (${wrongQuestions.length})`}
+          </button>
+
+          {/* Dashboard */}
           <button
             className="btn btn-outline"
             onClick={() => navigate('/dashboard')}
-            style={{ flex: 1 }}
+            style={{ flex: 1, borderColor: 'var(--green)', }}
           >
             Dashboard
           </button>

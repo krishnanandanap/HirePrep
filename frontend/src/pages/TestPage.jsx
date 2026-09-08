@@ -49,6 +49,7 @@ export default function TestPage() {
 
   // Questions passed from ResultPage when Try Again is clicked
   const retryQuestions = location.state?.questions || null;
+  const wrongQuestions = location.state?.wrongQuestions || null;
 
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
@@ -60,9 +61,32 @@ export default function TestPage() {
   const timerRef = useRef(null);
 
   useEffect(() => {
+    // If this is Practice Wrong Questions, use only the wrong questions.
+    if (wrongQuestions && wrongQuestions.length > 0) {
+      setQuestions(wrongQuestions);
+
+      const initialState = {};
+
+      wrongQuestions.forEach((q) => {
+        initialState[q.id] = {
+          answer: null,
+          visited: false,
+          review: false,
+        };
+      });
+
+      initialState[wrongQuestions[0].id].visited = true;
+
+      setQuestionState(initialState);
+      setCurrent(0);
+      setTimeLeft(TOTAL_TIME);
+      setLoading(false);
+
+      return;
+    }
+
     // If this is Try Again, use the exact same questions.
     if (retryQuestions && retryQuestions.length > 0) {
-      setQuestions(retryQuestions);
 
       const initialState = {};
 
@@ -118,7 +142,7 @@ export default function TestPage() {
         console.error('Error fetching questions:', error);
         setLoading(false);
       });
-  }, [categoryParam, retryQuestions]);
+  }, [categoryParam, retryQuestions, wrongQuestions]);
 
   // Start timer once questions are loaded
   useEffect(() => {
@@ -281,8 +305,10 @@ export default function TestPage() {
         >
           <div>
             <h2 style={{ fontWeight: 700, fontSize: 20 }}>
-              {selectedCategories.length > 0
-                ? selectedCategories.join(' + ') + ' Quiz'
+              {wrongQuestions && wrongQuestions.length > 0
+                ? 'Wrong Questions Test'
+                : selectedCategories.length > 0
+                ? selectedCategories.join(' + ') + ' Test'
                 : 'Mock Interview Test'}
             </h2>
 
