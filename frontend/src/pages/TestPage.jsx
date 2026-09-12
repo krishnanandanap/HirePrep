@@ -86,27 +86,29 @@ export default function TestPage() {
     }
 
     // If this is Try Again, use the exact same questions.
-    if (retryQuestions && retryQuestions.length > 0) {
+    // If this is Try Again, use the exact same questions.
+if (retryQuestions && retryQuestions.length > 0) {
+  setQuestions(retryQuestions);
 
-      const initialState = {};
+  const initialState = {};
 
-      retryQuestions.forEach((q) => {
-        initialState[q.id] = {
-          answer: null,
-          visited: false,
-          review: false,
-        };
-      });
+  retryQuestions.forEach((q) => {
+    initialState[q.id] = {
+      answer: null,
+      visited: false,
+      review: false,
+    };
+  });
 
-      initialState[retryQuestions[0].id].visited = true;
+  initialState[retryQuestions[0].id].visited = true;
 
-      setQuestionState(initialState);
-      setCurrent(0);
-      setTimeLeft(TOTAL_TIME);
-      setLoading(false);
+  setQuestionState(initialState);
+  setCurrent(0);
+  setTimeLeft(TOTAL_TIME);
+  setLoading(false);
 
-      return;
-    }
+  return;
+}
 
     // Otherwise, load a new test normally.
     const questionEndpoint =
